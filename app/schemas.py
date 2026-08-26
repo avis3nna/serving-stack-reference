@@ -86,3 +86,4 @@ class HealthResponse(BaseModel):
     """The body returned by GET /health."""
     status: Literal["ok"] = "ok"
     model: str
+    device: str
