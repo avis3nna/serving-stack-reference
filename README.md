@@ -40,3 +40,31 @@ This repository is your code.
 
 Then read `setup.md`. It is short, and it covers the two things that go wrong:
 committing a key, and committing a model.
+
+---
+
+## W2D1: first contact (reference)
+
+Measured on a Colab T4, `Qwen/Qwen2.5-1.5B-Instruct`, 128 generated tokens.
+
+| dtype | predicted GB | measured GB | observed bytes/param | tokens/s |
+|---|---|---|---|---|
+| fp16 | 3.0 | 3.29 | 2.19 | 31.9 |
+| int8 | 1.5 | 1.87 | 1.25 | 6.0 |
+| int4 | 0.75 | 1.24 | 0.83 | 15.3 |
+
+Three things the numbers say that the formula does not:
+
+- **Measured always exceeds predicted.** Parameters times bytes is weights only.
+  The CUDA context, the framework and the activations are the rest, and they do
+  not shrink when the weights do.
+- **The quantised rows overshoot hardest.** int4 predicted 0.75 GB and measured
+  1.24 GB, so observed bytes per parameter is 0.83 rather than 0.5. Quantisation
+  is applied to most of the weights, not all of them, and the fixed overhead is
+  now a larger share of a smaller number.
+- **int8 is slower than int4, and both are slower than fp16.** Smaller weights do
+  not mean faster. bitsandbytes int8 dequantises on the fly through a path with
+  no fused kernel, so it saves memory and costs speed. That gap is the plant for
+  week 3 Thursday: the bits were never the problem, the kernels were.
+
+Files: `generate.py`, `results.json`.
