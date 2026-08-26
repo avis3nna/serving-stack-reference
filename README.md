@@ -68,3 +68,35 @@ Three things the numbers say that the formula does not:
   week 3 Thursday: the bits were never the problem, the kernels were.
 
 Files: `generate.py`, `results.json`.
+
+---
+
+## W2D3: containerise (reference)
+
+`.dockerignore`, `Dockerfile`, and `Dockerfile.naive` at the repo root.
+
+```bash
+docker build -t <user>/aidc-serving:cpu-v1 .
+docker run --rm -p 8000:8000 -v hf-cache:/home/app/.cache/huggingface \
+  <user>/aidc-serving:cpu-v1
+```
+
+The slim image lands near **1.6 GB**. Build `Dockerfile.naive` alongside it and
+read the gap off `docker images` yourself; that number is your card, not ours.
+
+Four decisions in the Dockerfile, each with a reason:
+
+- **`python:3.11-slim`, not `python:3.11`.** You do not need build toolchains at
+  run time for these wheels.
+- **`requirements.txt` copied and installed BEFORE `app/`.** Requirements change
+  rarely, code changes constantly. Separate layers mean a code edit reuses the
+  cached install instead of re-downloading torch every build.
+- **`--index-url` on the CPU wheel index.** Without it pip takes the default CUDA
+  build of torch and the image is roughly 6.5 GB instead of 1.6.
+- **`chown` before `USER app`.** A volume mountpoint that Docker auto-creates is
+  root-owned, so a container that has already dropped privileges cannot write
+  the first model download into it.
+
+The weights are not in the image, and that is the rule the whole day is shaped
+around. They arrive at run time into the mounted cache volume, which keeps the
+image generic: the same image serves any model id.
