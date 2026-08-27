@@ -1,0 +1,31 @@
+FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
+
+# python is not in the CUDA base; install 3.11 explicitly - plain `python3`
+# on ubuntu22.04 is 3.10, off the course's python:3.11 baseline
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      python3.11 python3-pip python3.11-venv && \
+    rm -rf /var/lib/apt/lists/* && \
+    ln -sf /usr/bin/python3.11 /usr/local/bin/python && \
+    ln -sf /usr/bin/python3.11 /usr/local/bin/python3
+
+# the run command mounts hf-cache at /home/app/.cache/huggingface; HF_HOME must
+# point there and the process must run as that user, or the model caches to
+# /root and re-downloads on every fresh container
+ENV HF_HOME=/home/app/.cache/huggingface
+RUN useradd --create-home --uid 10001 app
+
+WORKDIR /app
+
+COPY app/requirements.txt .
+# uv downloads the wheels in parallel; pip does one at a time on one connection,
+# which is most of this build's wall clock. Same pins, same index.
+RUN pip3 install --no-cache-dir uv && \
+    uv pip install --system --no-cache -r requirements.txt   # torch per ../../../PINS.md
+
+COPY app/ .
+
+RUN mkdir -p /home/app/.cache/huggingface && chown -R app:app /home/app/.cache /app
+USER app
+
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
